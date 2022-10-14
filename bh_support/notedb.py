@@ -27,19 +27,13 @@
 
 from typing import Dict, List
 
-#import calendar
-#import datetime
-#import json
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
-#import urllib.parse
-
-#from datetime             import datetime, timedelta
-#from ietfdata.rfcindex    import *
-#from ietfdata.datatracker import *
+import urllib.parse
 
 # =================================================================================================
 # Code to communicate with the running Bear application:
