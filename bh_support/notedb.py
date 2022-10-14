@@ -25,8 +25,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from typing import Dict, List
-
 import json
 import os
 import re
@@ -34,6 +32,9 @@ import shutil
 import subprocess
 import sys
 import urllib.parse
+
+from typing  import Dict, List
+from pathlib import Path
 
 # =================================================================================================
 # Code to communicate with the running Bear application:
