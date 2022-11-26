@@ -98,8 +98,26 @@ class NoteDB:
             print(f"             {line[s:e]}")
 
 
+    def _synchronise_note(self, note, path, ident) -> None:
+        print(f"synchronise: {note['title']}")
+        path.mkdir(parents=True, exist_ok=True)
+        with open(path / "note.json", "w") as outf:
+            outf.write(json.dumps(note))
+        with open(path / "note.md", "w") as outf:
+            result  = xcall("bear", "open-note", {"id": ident, "open_note": "no", "show_window": "no"})
+            content = result["note"].splitlines()
+            for line in content:
+                outf.write(line)
+                outf.write("\n")
+                if "[file:" in line:
+                    self._synchronise_attachment("file", path, line)
+                if "[image:" in line:
+                    self._synchronise_attachment("image", path, line)
+
+
     def synchronise(self) -> None:
         self._nlist = {}
+        title_changed = []
         active = []
         result = xcall("bear", "search", {"show_window": "no", "token": "EBBE62-71E861-46E1B9"})
         nlist  = json.loads(result["notes"])
@@ -118,25 +136,37 @@ class NoteDB:
                     meta = json.load(json_file)
                     if sorted(meta["tags"]) != sorted(note["tags"]):
                         tags_changed = True
+            else:
+                # Has the note title changed compared to the previously backed-up version?
+                note_dates = sorted(list(Path(F"{BACKUP_DIR}/active/{ident}/").glob("*")))
+                json_path  = note_dates[-1] / "note.json"
+                with open(json_path, "r") as json_file:
+                    meta = json.load(json_file)
+                    if meta["title"] != note["title"]:
+                        print(f"titleChange: {meta['title']} -> {note['title']}")
+                        title_changed.append(meta["title"])
 
             done = path / ".done"
             if not done.exists() or tags_changed:
-                print(f"synchronise: {note['title']}")
-                path.mkdir(parents=True, exist_ok=True)
-                with open(path / "note.json", "w") as outf:
-                    outf.write(json.dumps(note))
-                with open(path / "note.md", "w") as outf:
-                    result  = xcall("bear", "open-note", {"id": ident, "open_note": "no", "show_window": "no"})
-                    content = result["note"].splitlines()
-                    for line in content:
-                        outf.write(line)
-                        outf.write("\n")
-                        if "[file:" in line:
-                            self._synchronise_attachment("file", path, line)
-                        if "[image:" in line:
-                            self._synchronise_attachment("image", path, line)
+                self._synchronise_note(note, path, ident)
                 done.touch()
 
+        # When a note title changes, Bear updates wiki-style links to the
+        # note with the changed title but doesn't update the modification
+        # time of those notes. If there are notes with changed titles, we
+        # must manually find those notes that link to them, and back them
+        # up.
+        for ident in active:
+            for link in self.note_links(ident):
+                if link in title_changed:
+                    note = self._nlist[ident]
+                    mdate = note["modificationDate"].replace(":", "-")
+                    path  = Path(BACKUP_DIR) / "active" / ident / mdate
+                    done = path / ".done"
+                    self._synchronise_note(note, path, ident)
+                    done.touch()
+
+        # Remove deleted notes
         for note in Path(F"{BACKUP_DIR}/active").glob("*"):
             del_dir = Path(BACKUP_DIR) / "deleted"
             del_dir.mkdir(exist_ok=True)
@@ -144,7 +174,7 @@ class NoteDB:
                 src = Path(BACKUP_DIR) / "active"  / note.name
                 dst = Path(BACKUP_DIR) / "deleted" / note.name
                 if dst.exists():
-                    print(f"ERROR: deleted note is already deleted? {note.name}")
+                    print(f"ERROR: deleted note was already deleted? {note.name}")
                 else:
                     src.rename(dst)
                     print(f"{note.name} deleted")
@@ -198,6 +228,29 @@ class NoteDB:
         with open(note_file, "r") as inf:
             note = inf.read().splitlines()
         return note
+
+
+    def note_links(self, note_id:str) -> List[str]:
+        # Returns the list of notes that this has links to
+        links = []
+        for line in self.note_contents(note_id):
+            offset = 0
+            found  = True
+            while found:
+                start  = line.find("[[", offset)
+                if start == -1:
+                    found = False
+                else:
+                    finish = line.find("]]", start)
+                    if finish == -1:
+                        print(f"ERROR: unterminated link in note {note_id}")
+                        print(f"  {line}")
+                        sys.exit()
+                    link = line[start + 2:finish]
+                    if not link in links:
+                        links.append(link)
+                    offset = finish + 2
+        return links
 
 
     def add_to_note(self, note_title, text_to_add):
