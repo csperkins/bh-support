@@ -139,12 +139,13 @@ class NoteDB:
             else:
                 # Has the note title changed compared to the previously backed-up version?
                 note_dates = sorted(list(Path(F"{BACKUP_DIR}/active/{ident}/").glob("*")))
-                json_path  = note_dates[-1] / "note.json"
-                with open(json_path, "r") as json_file:
-                    meta = json.load(json_file)
-                    if meta["title"] != note["title"]:
-                        print(f"titleChange: {meta['title']} -> {note['title']}")
-                        title_changed.append(meta["title"])
+                if note_dates != []:
+                    json_path  = note_dates[-1] / "note.json"
+                    with open(json_path, "r") as json_file:
+                        meta = json.load(json_file)
+                        if meta["title"] != note["title"]:
+                            print(f"titleChange: {meta['title']} -> {note['title']}")
+                            title_changed.append(meta["title"])
 
             done = path / ".done"
             if not done.exists() or tags_changed:
