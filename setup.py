@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="bh_support",
-    version="0.0.1",
+    version="0.0.2",
     author="Colin Perkins",
     author_email="csp@csperkins.org",
     description="Helper to access Bear.app",
